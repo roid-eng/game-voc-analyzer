@@ -1,0 +1,22 @@
+# 환경 변수
+.env
+
+# Google 서비스 계정 JSON
+*.json
+service_account*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
