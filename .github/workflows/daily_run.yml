@@ -1,0 +1,59 @@
+name: Daily VOC Analysis
+
+on:
+  schedule:
+    - cron: '0 1 * * *'   # 매일 KST 10:00 (UTC 01:00)
+  workflow_dispatch:        # 수동 실행 허용
+    inputs:
+      game:
+        description: '분석할 게임 (비워두면 전체 실행)'
+        required: false
+        default: ''
+        type: choice
+        options:
+          - ''
+          - lineage_m
+          - browndust2
+      count:
+        description: '게임당 수집 리뷰 수'
+        required: false
+        default: '100'
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write   # data/reviews.csv 자동 커밋용
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pipeline
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.game }}" ]; then
+            ARGS="$ARGS --game ${{ inputs.game }}"
+          fi
+          ARGS="$ARGS --count ${{ inputs.count || '100' }}"
+          python main.py $ARGS
+
+      - name: Commit updated CSV
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/reviews.csv
+          git diff --cached --quiet || git commit -m "data: update reviews.csv [$(date +%Y-%m-%d)]"
+          git push
