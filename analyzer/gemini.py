@@ -16,7 +16,7 @@ SENTIMENTS = ["부정", "중립", "긍정"]
 _PROMPT_TEMPLATE = """\
 아래 게임 리뷰들을 분석하여 JSON 배열로 반환하라.
 각 항목은 반드시 다음 키를 포함해야 한다:
-- category: {categories} 중 하나
+- category: 반드시 아래 목록 중 정확히 하나를 그대로 사용 (번역·변형 금지): {categories}
 - sentiment: {sentiments} 중 하나
 - summary: 리뷰 핵심을 1~2문장으로 요약
 - keywords: 핵심 키워드 3개 이내, 쉼표로 구분한 문자열
@@ -43,8 +43,8 @@ def _build_prompt(records: list[dict]) -> str:
         for i, r in enumerate(records)
     ]
     return _PROMPT_TEMPLATE.format(
-        categories="、".join(CATEGORIES),
-        sentiments="、".join(SENTIMENTS),
+        categories=" / ".join(CATEGORIES),
+        sentiments=" / ".join(SENTIMENTS),
         reviews_json=json.dumps(reviews, ensure_ascii=False, indent=2),
     )
 
