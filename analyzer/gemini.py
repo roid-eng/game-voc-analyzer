@@ -22,6 +22,8 @@ _PROMPT_TEMPLATE = """\
 - keywords: 핵심 키워드 3개 이내, 쉼표로 구분한 문자열
 - priority: 긴급도 1~5 정수 (5가 가장 긴급)
 
+한국어가 아닌 리뷰는 한국어로 번역 후 분석하라.
+
 리뷰 목록 (index 순서대로 결과를 반환):
 {reviews_json}
 
