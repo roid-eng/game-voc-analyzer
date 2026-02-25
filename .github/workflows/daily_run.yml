@@ -50,11 +50,14 @@ jobs:
           ARGS="$ARGS --count ${{ inputs.count || '100' }}"
           python main.py $ARGS
 
+      - name: Generate top_issues.csv
+        run: python extract_top_issues.py
+
       - name: Commit updated CSV
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/reviews.csv
-          git diff --cached --quiet || git commit -m "data: update reviews.csv [$(date +%Y-%m-%d)]"
+          git add data/reviews.csv data/top_issues.csv
+          git diff --cached --quiet || git commit -m "data: update reviews.csv + top_issues.csv [$(date +%Y-%m-%d)]"
           git pull --rebase origin main
           git push
