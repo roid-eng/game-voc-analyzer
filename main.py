@@ -5,6 +5,7 @@ from config import GAMES
 from collector.playstore import fetch_reviews, fetch_all
 from analyzer.gemini import analyze
 from storage.csv_storage import save
+from reporter.telegram import send_briefing
 
 
 def run(game_key: str | None, days: int) -> None:
@@ -31,6 +32,9 @@ def run(game_key: str | None, days: int) -> None:
     print("\n[main] 저장 시작")
     save(analyzed)
     print("[main] 저장 완료")
+
+    # 4. 텔레그램 브리핑
+    send_briefing(days)
 
 
 def main() -> None:

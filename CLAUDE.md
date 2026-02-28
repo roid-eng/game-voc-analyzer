@@ -16,6 +16,7 @@ Google Play 리뷰를 자동 수집·분석하여 플레이어 불만/요구사�
 | 수집 | google-play-scraper (개발자 계정 불필요) |
 | AI 분석 | Groq API (llama-3.3-70b-versatile, 무료 티어) |
 | 저장 | CSV (data/reviews.csv, GitHub 리포에 누적 커밋) |
+| 알림 | Telegram Bot API (일일 브리핑 자동 발송) |
 | 자동화 | GitHub Actions (매일 1회, 분석 후 CSV 자동 커밋) |
 | 환경 관리 | python-dotenv (.env) |
 
@@ -63,11 +64,15 @@ game-voc-analyzer/
 │   ├── __init__.py
 │   └── csv_storage.py         # CSV 누적 저장 (중복 방지)
 │
+├── reporter/
+│   ├── __init__.py
+│   └── telegram.py            # 텔레그램 일일 브리핑 발송
+│
 ├── data/
 │   └── reviews.csv            # 분석 결과 누적 데이터 (git 추적)
 │
-├── config.py                  # 게임 설정 (앱 ID 등)
-├── main.py                    # 진입점 (수집 → 분석 → 저장)
+├── config.py                  # 게임 설정 (앱 ID, 레이블 등)
+├── main.py                    # 진입점 (수집 → 분석 → 저장 → 브리핑)
 │
 └── .github/
     └── workflows/
@@ -109,7 +114,12 @@ game-voc-analyzer/
 
 ```
 GROQ_API_KEY=your_groq_api_key
+TELEGRAM_BOT_TOKEN=your_bot_token      # 텔레그램 브리핑용
+TELEGRAM_CHAT_ID=your_chat_id          # 텔레그램 브리핑용
 ```
+
+> TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 가 없으면 브리핑을 스킵하고 정상 종료한다.
+> GitHub Actions에서는 Repository Secrets에 두 항목을 등록해야 한다.
 
 ---
 
