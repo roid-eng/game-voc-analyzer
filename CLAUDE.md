@@ -119,15 +119,16 @@ GROQ_API_KEY=your_groq_api_key
 # 의존성 설치
 pip install -r requirements.txt
 
-# 전체 파이프라인 실행 (모든 게임)
+# 전체 파이프라인 실행 (모든 게임, 최근 30일)
 python main.py
 
 # 특정 게임만 실행
 python main.py --game lineage_m
 python main.py --game browndust2
 
-# 수집 리뷰 수 지정 (기본값: 100)
-python main.py --count 200
+# 수집 기간 지정 (기본값: 30일)
+python main.py --days 7       # 최근 7일
+python main.py --days 90      # 과거 데이터 소급 수집
 ```
 
 ---

@@ -14,10 +14,10 @@ on:
           - ''
           - lineage_m
           - browndust2
-      count:
-        description: '게임당 수집 리뷰 수'
+      days:
+        description: '수집할 리뷰 기간 (일)'
         required: false
-        default: '100'
+        default: '30'
 
 jobs:
   analyze:
@@ -47,7 +47,7 @@ jobs:
           if [ -n "${{ inputs.game }}" ]; then
             ARGS="$ARGS --game ${{ inputs.game }}"
           fi
-          ARGS="$ARGS --count ${{ inputs.count || '100' }}"
+          ARGS="$ARGS --days ${{ inputs.days || '30' }}"
           python main.py $ARGS
 
       - name: Generate top_issues.csv

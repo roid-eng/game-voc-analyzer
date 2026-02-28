@@ -36,12 +36,18 @@ def save(records: list[dict]) -> None:
         print(f"[storage] 신규 리뷰 없음 (중복 {skipped}건 제외)")
         return
 
+    def _clean(record: dict) -> dict:
+        return {
+            k: v.encode("utf-8", errors="ignore").decode("utf-8") if isinstance(v, str) else v
+            for k, v in record.items()
+        }
+
     write_header = not CSV_PATH.exists()
     with CSV_PATH.open("a", encoding="utf-8", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS, extrasaction="ignore")
         if write_header:
             writer.writeheader()
-        writer.writerows(new_records)
+        writer.writerows(_clean(r) for r in new_records)
 
     print(f"[storage] {len(new_records)}건 저장 완료 (중복 {skipped}건 제외)")
     print(f"[storage] 저장 경로: {CSV_PATH.resolve()}")

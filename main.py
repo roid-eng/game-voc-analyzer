@@ -7,15 +7,15 @@ from analyzer.gemini import analyze
 from storage.csv_storage import save
 
 
-def run(game_key: str | None, count: int) -> None:
+def run(game_key: str | None, days: int) -> None:
     # 1. 수집
     if game_key:
-        print(f"\n[main] 수집 시작: {game_key} ({count}건)")
-        records = fetch_reviews(game_key, count)
+        print(f"\n[main] 수집 시작: {game_key} (최근 {days}일)")
+        records = fetch_reviews(game_key, days)
         print(f"[main] 수집 완료: {len(records)}건")
     else:
-        print(f"\n[main] 수집 시작: 전체 게임 ({count}건/게임)")
-        records = fetch_all(count)
+        print(f"\n[main] 수집 시작: 전체 게임 (최근 {days}일)")
+        records = fetch_all(days)
         print(f"[main] 수집 완료: 총 {len(records)}건")
 
     if not records:
@@ -42,15 +42,15 @@ def main() -> None:
         help="분석할 게임 (미지정 시 전체 게임 실행)",
     )
     parser.add_argument(
-        "--count",
+        "--days",
         type=int,
-        default=100,
-        help="게임당 수집할 리뷰 수 (기본값: 100)",
+        default=30,
+        help="수집할 리뷰 기간 (기본값: 30일)",
     )
     args = parser.parse_args()
 
     try:
-        run(args.game, args.count)
+        run(args.game, args.days)
     except KeyboardInterrupt:
         print("\n[main] 사용자 중단")
         sys.exit(0)
