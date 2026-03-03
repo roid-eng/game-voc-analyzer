@@ -5,7 +5,7 @@ from config import GAMES
 from collector.playstore import fetch_reviews, fetch_all
 from analyzer.gemini import analyze
 from storage.csv_storage import save
-from reporter.telegram import send_briefing
+from reporter.telegram import send_briefing, send_no_review_notice
 
 
 def run(game_key: str | None, days: int) -> None:
@@ -20,7 +20,8 @@ def run(game_key: str | None, days: int) -> None:
         print(f"[main] 수집 완료: 총 {len(records)}건")
 
     if not records:
-        print("[main] 수집된 리뷰가 없습니다. 종료합니다.")
+        print("[main] 수집된 리뷰가 없습니다.")
+        send_no_review_notice()
         return
 
     # 2. 분석

@@ -119,6 +119,7 @@ TELEGRAM_CHAT_ID=your_chat_id          # 텔레그램 브리핑용
 ```
 
 > TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID 가 없으면 브리핑을 스킵하고 정상 종료한다.
+> 당일 새 리뷰가 없으면 "오늘 새로운 리뷰가 없습니다." 메시지를 발송한다 (파이프라인 중단 없이).
 > GitHub Actions에서는 Repository Secrets에 두 항목을 등록해야 한다.
 
 ---

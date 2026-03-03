@@ -150,6 +150,24 @@ def _send(token: str, chat_id: str, text: str) -> None:
         raise RuntimeError(f"Telegram 발송 실패: {result}")
 
 
+def send_no_review_notice() -> None:
+    """당일 새 리뷰가 없을 때 텔레그램으로 알린다."""
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+
+    if not token or not chat_id:
+        print("[reporter] TELEGRAM_BOT_TOKEN/CHAT_ID 없음 - 스킵")
+        return
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    text = f"🎮 게임 VOC 일일 브리핑 | {today}\n\n오늘 새로운 리뷰가 없습니다."
+    try:
+        _send(token, chat_id, text)
+        print("[reporter] 텔레그램 '새 리뷰 없음' 알림 발송 완료")
+    except Exception as e:
+        print(f"[reporter] 텔레그램 발송 실패: {e}")
+
+
 def send_briefing(days: int = 30) -> None:
     """일일 VOC 브리핑을 텔레그램으로 발송한다."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
