@@ -73,6 +73,10 @@ game-voc-analyzer/
 │
 ├── config.py                  # 게임 설정 (앱 ID, 레이블 등)
 ├── main.py                    # 진입점 (수집 → 분석 → 저장 → 브리핑)
+├── generate_dashboard.py      # docs/index.html 생성 (Chart.js 대시보드)
+│
+├── docs/
+│   └── index.html             # GitHub Pages 대시보드 (자동 생성, git 추적)
 │
 └── .github/
     └── workflows/
@@ -144,9 +148,19 @@ python main.py --days 90      # 과거 데이터 소급 수집
 
 ---
 
+## 대시보드 (GitHub Pages)
+
+- `generate_dashboard.py` 실행 시 `docs/index.html` 자동 생성
+- Chart.js 기반, 외부 의존성 없음 (CDN만 사용)
+- 구성: 위험등급 카드 / 일별 트렌드 / 카테고리·감성 도넛 / 게임별 비교 막대 / 긴급 이슈 테이블
+- GitHub Pages 설정: Settings → Pages → Source: `main` 브랜치, `/docs` 폴더
+- GitHub Actions가 매일 HTML을 재생성 후 커밋 → Pages 자동 갱신
+
+---
+
 ## 주의사항
 
 - Groq 무료 티어: 분당 30회 요청 제한 (llama-3.3-70b-versatile). 배치 처리 시 rate limit 고려.
 - google-play-scraper는 비공식 API. Google Play 정책 변경 시 동작 불안정 가능.
-- data/reviews.csv는 git에서 추적한다. GitHub Actions가 매일 자동 커밋.
+- data/reviews.csv, docs/index.html 은 git에서 추적한다. GitHub Actions가 매일 자동 커밋.
 - review_id 기준 중복 체크로 동일 리뷰가 두 번 저장되지 않는다.

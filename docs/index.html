@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>게임 VOC 분석 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+header { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
+header h1 { font-size: 1.5rem; font-weight: 700; }
+header p { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+.row { display: grid; gap: 16px; margin-bottom: 24px; }
+.row-3 { grid-template-columns: 1fr 1fr 1fr; }
+.row-1 { grid-template-columns: 1fr; }
+.row-2 { grid-template-columns: 1fr 1fr; }
+.card { background: #1e293b; border-radius: 12px; padding: 20px; }
+.card h2 { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+.risk-value { font-size: 2.2rem; font-weight: 800; }
+.stat-value { font-size: 2.5rem; font-weight: 800; color: #38bdf8; }
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap-lg { position: relative; height: 300px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th { text-align: left; padding: 10px 12px; background: #0f172a; color: #94a3b8; font-weight: 600; }
+td { padding: 10px 12px; border-top: 1px solid #0f172a; vertical-align: top; }
+tr:hover td { background: #263348; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+.p5 { background: #450a0a; color: #fca5a5; }
+.p4 { background: #431407; color: #fdba74; }
+.empty { text-align: center; color: #64748b; padding: 24px; }
+@media (max-width: 768px) {
+  .row-3, .row-2 { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>🎮 게임 VOC 분석 대시보드</h1>
+  <p>마지막 업데이트: 2026-03-04 &nbsp;|&nbsp; 리니지M · 브라운더스트2</p>
+</header>
+<div class="container">
+
+  <!-- Row 1: 요약 카드 -->
+  <div class="row row-3">
+    <div class="card">
+      <h2>리니지M 위험등급</h2>
+      <div class="risk-value" style="color:#f59e0b">MID</div>
+    </div>
+    <div class="card">
+      <h2>브라운더스트2 위험등급</h2>
+      <div class="risk-value" style="color:#f59e0b">MID</div>
+    </div>
+    <div class="card">
+      <h2>이번 주 총 리뷰</h2>
+      <div class="stat-value">13건</div>
+    </div>
+  </div>
+
+  <!-- Row 2: 일별 트렌드 -->
+  <div class="row row-1">
+    <div class="card">
+      <h2>최근 30일 일별 리뷰 추이</h2>
+      <div class="chart-wrap-lg"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: 파이 차트 -->
+  <div class="row row-2">
+    <div class="card">
+      <h2>카테고리 분포 (전체)</h2>
+      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>감성 분포 (전체)</h2>
+      <div class="chart-wrap"><canvas id="sentimentChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 4: 막대 차트 -->
+  <div class="row row-2">
+    <div class="card">
+      <h2>게임별 카테고리 비교</h2>
+      <div class="chart-wrap"><canvas id="gameCategoryChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>긴급도별 분포</h2>
+      <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 5: 긴급 이슈 테이블 -->
+  <div class="row row-1">
+    <div class="card">
+      <h2>이번 주 긴급 이슈 (긴급도 4~5)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>게임</th><th>카테고리</th><th>긴급도</th><th>요약</th><th>키워드</th>
+          </tr>
+        </thead>
+        <tbody id="urgentBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+const D = {"updated": "2026-03-04", "risk": {"lineage_m": "MID", "browndust2": "MID"}, "week_total": 13, "trend": {"dates": ["2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-07", "2026-02-08", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-14", "2026-02-15", "2026-02-16", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-21", "2026-02-22", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-02-28", "2026-03-01", "2026-03-02", "2026-03-03", "2026-03-04"], "lineage_m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0], "browndust2": [0, 2, 2, 3, 5, 4, 2, 0, 0, 5, 6, 2, 1, 6, 1, 3, 1, 7, 1, 3, 1, 1, 0, 4, 2, 3, 4, 0, 0, 0]}, "category": {"labels": ["밸런스", "BM", "강화", "서버", "운영"], "values": [51, 98, 36, 81, 131]}, "sentiment": {"labels": ["긍정", "부정", "중립"], "values": [167, 168, 59]}, "game_category": {"labels": ["BM", "밸런스", "강화", "서버", "운영"], "lineage_m": [30, 15, 10, 29, 16], "browndust2": [68, 36, 26, 52, 115]}, "priority": {"labels": ["긴급도 1", "긴급도 2", "긴급도 3", "긴급도 4", "긴급도 5"], "values": [124, 58, 51, 64, 109]}, "urgent_table": [{"game": "브라운더스트2", "category": "운영", "summary": "불만사항이 많아 게임이 재미없습니다.", "keywords": "불만, 게임", "priority": 5}, {"game": "브라운더스트2", "category": "서버", "summary": "접속이 안되어 게임을 즐길 수 없습니다.", "keywords": "접속, 게임", "priority": 5}, {"game": "브라운더스트2", "category": "서버", "summary": "게임이 계속 튕겨서 플레이가 불가능합니다. 재접속이나 삭제하고 설치해도 동일한 문제가 발생합니다.", "keywords": "게임 튕김, 재접속, 삭제 설치", "priority": 5}, {"game": "브라운더스트2", "category": "서버", "summary": " 황금투기장에서 게임이 튕긴다. 최적화를 잘못한 것 같아 불편하다.", "keywords": "튜기, 최적화, 황금투기장", "priority": 5}, {"game": "브라운더스트2", "category": "강화", "summary": "확률 조작이 의심되고, 최적화가不好하며, 할 게 없다.", "keywords": "확률, 최적화, 조작", "priority": 5}, {"game": "브라운더스트2", "category": "기타", "summary": "게임의 사양이 높고 버그가 많아 게임을 즐기기 어렵다.", "keywords": "사양, 버그", "priority": 4}, {"game": "브라운더스트2", "category": "기타", "summary": "1_ ", "keywords": "1_, ", "priority": 4}, {"game": "브라운더스트2", "category": "밸런스", "summary": "무기 뽑기 확률이 맞지 않습니다. 2.5%의 확률에서 점점 낮아져서 뽑기 불가능합니다.", "keywords": "무기 뽑기, 확률, 뽑기 불가", "priority": 4}]};
+const GRID = '#263348';
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+// 트렌드
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: D.trend.dates,
+    datasets: [
+      { label: '리니지M', data: D.trend.lineage_m, borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', tension: 0.3, fill: true, pointRadius: 3 },
+      { label: '브라운더스트2', data: D.trend.browndust2, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)', tension: 0.3, fill: true, pointRadius: 3 },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { grid: { color: GRID }, ticks: { maxTicksLimit: 10 } },
+      y: { grid: { color: GRID }, beginAtZero: true }
+    }
+  }
+});
+
+// 카테고리 도넛
+new Chart(document.getElementById('categoryChart'), {
+  type: 'doughnut',
+  data: {
+    labels: D.category.labels,
+    datasets: [{ data: D.category.values, backgroundColor: ['#f472b6','#818cf8','#34d399','#fbbf24','#f87171','#a78bfa'] }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+});
+
+// 감성 도넛
+new Chart(document.getElementById('sentimentChart'), {
+  type: 'doughnut',
+  data: {
+    labels: D.sentiment.labels,
+    datasets: [{ data: D.sentiment.values, backgroundColor: ['#f87171','#94a3b8','#34d399','#64748b'] }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+});
+
+// 게임별 카테고리 막대
+new Chart(document.getElementById('gameCategoryChart'), {
+  type: 'bar',
+  data: {
+    labels: D.game_category.labels,
+    datasets: [
+      { label: '리니지M', data: D.game_category.lineage_m, backgroundColor: '#f472b6' },
+      { label: '브라운더스트2', data: D.game_category.browndust2, backgroundColor: '#38bdf8' },
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
+  }
+});
+
+// 긴급도 막대
+new Chart(document.getElementById('priorityChart'), {
+  type: 'bar',
+  data: {
+    labels: D.priority.labels,
+    datasets: [{ label: '건수', data: D.priority.values, backgroundColor: ['#34d399','#6ee7b7','#fbbf24','#f97316','#ef4444'] }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
+  }
+});
+
+// 긴급 이슈 테이블
+const tbody = document.getElementById('urgentBody');
+if (D.urgent_table.length === 0) {
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">이번 주 긴급 이슈 없음</td></tr>';
+} else {
+  D.urgent_table.forEach(r => {
+    const cls = r.priority === 5 ? 'p5' : 'p4';
+    tbody.innerHTML += `<tr>
+      <td>${r.game}</td>
+      <td>${r.category}</td>
+      <td><span class="badge ${cls}">${r.priority}</span></td>
+      <td>${r.summary}</td>
+      <td style="color:#94a3b8;font-size:0.8rem">${r.keywords}</td>
+    </tr>`;
+  });
+}
+</script>
+</body>
+</html>
