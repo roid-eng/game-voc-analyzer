@@ -622,3 +622,4 @@ date,game,genre,review_id,rating,review_text,category,sentiment,summary,keywords
 2026-06-11,browndust2,전략RPG,2be6bfe7-77ef-4ec3-bf1e-f0dcf218cee3,5,잼,BM,긍정,게임이 재미있다. 게임을 즐기고 있다.,"게임, 재미",1
 2026-06-11,browndust2,전략RPG,3fdd7e0f-5c34-4c7d-be00-c92970ac6e8d,4,아직까진 낫베드,밸런스,중립,"게임은 나쁘지 않지만, บาง 부분이 아쉽다. 개선이 이루어지면 좋겠다.","게임, 아쉬움",2
 2026-06-11,browndust2,전략RPG,b7419208-a559-4478-b816-80bdd3cacd17,4,왜자꾸 결투장 비정상 전투라고 뜨고 팅기지요?,서버,부정,결투장에서 비정상 전투 오류가 발생한다. 개발자가 이를 修復하면 좋겠다.,"결투장, 오류, 비정상 전투",5
+2026-06-13,browndust2,전략RPG,1128e6e2-699f-454f-840e-08e527bb84ba,5,너무 재밌어요!!,BM,긍정,게임이 재미있습니다.,"재미, 게임",1
