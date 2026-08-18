@@ -14,7 +14,7 @@ Google Play 리뷰를 자동 수집·분석하여 플레이어 불만/요구사�
 |------|------|
 | 언어 | Python 3.11+ |
 | 수집 | google-play-scraper (개발자 계정 불필요) |
-| AI 분석 | Groq API (llama-3.3-70b-versatile, 무료 티어) |
+| AI 분석 | Groq API (openai/gpt-oss-120b, 무료 티어) |
 | 저장 | CSV (data/reviews.csv, GitHub 리포에 누적 커밋) |
 | 알림 | Telegram Bot API (일일 브리핑 자동 발송) |
 | 자동화 | GitHub Actions (매일 1회, 분석 후 CSV 자동 커밋) |
@@ -160,7 +160,8 @@ python main.py --days 90      # 과거 데이터 소급 수집
 
 ## 주의사항
 
-- Groq 무료 티어: 분당 30회 요청 제한 (llama-3.3-70b-versatile). 배치 처리 시 rate limit 고려.
+- Groq 무료 티어: 분당 30회 요청 제한 (openai/gpt-oss-120b, 분당 토큰 8,000). 배치 처리 시 rate limit 고려.
+- **모델 교체 이력**: 2026-08 `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` 마이그레이션. Groq의 llama-3.3-70b-versatile 폐기(2026-08-16) 조치에 따른 대응. TPM 한도가 낮아져(12,000→8,000) 배치 크기를 10→6으로 축소.
 - google-play-scraper는 비공식 API. Google Play 정책 변경 시 동작 불안정 가능.
 - data/reviews.csv, docs/index.html 은 git에서 추적한다. GitHub Actions가 매일 자동 커밋.
 - review_id 기준 중복 체크로 동일 리뷰가 두 번 저장되지 않는다.

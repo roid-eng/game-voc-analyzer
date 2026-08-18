@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _client = Groq(api_key=os.environ["GROQ_API_KEY"])
-_MODEL = "llama-3.3-70b-versatile"
+_MODEL = "openai/gpt-oss-120b"
 
 CATEGORIES = ["BM", "밸런스", "강화", "서버", "운영"]
 SENTIMENTS = ["부정", "중립", "긍정"]
@@ -31,9 +31,10 @@ _PROMPT_TEMPLATE = """\
 배열 길이는 입력 리뷰 수와 동일해야 한다.
 """
 
-# Groq 무료 티어: 분당 30회 요청 (llama-3.3-70b-versatile)
+# Groq 무료 티어 (openai/gpt-oss-120b): 분당 30회 요청, 분당 8,000 토큰
+# TPM이 llama-3.3-70b-versatile(12,000) 대비 낮아져 배치 크기를 줄임
 _REQUESTS_PER_MINUTE = 30
-_BATCH_SIZE = 10
+_BATCH_SIZE = 6
 _REQUEST_INTERVAL = 60.0 / _REQUESTS_PER_MINUTE  # 2초
 
 

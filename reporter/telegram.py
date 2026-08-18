@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _CSV_PATH = Path("data/reviews.csv")
-_MODEL = "llama-3.3-70b-versatile"
+_MODEL = "openai/gpt-oss-120b"
 
 _RISK_EMOJI = {"HIGH": "🔴", "MID": "🟡", "LOW": "🟢"}
 
