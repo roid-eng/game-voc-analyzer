@@ -38,8 +38,9 @@ def run(game_key: str | None, domain_key: str | None, days: int) -> None:
     save(analyzed)
     print("[main] 저장 완료")
 
-    # 4. 텔레그램 브리핑
-    send_briefing(days)
+    # 4. 텔레그램 브리핑 (이번 실행 범위에 해당하는 도메인만 발송)
+    briefing_domain = domain_key or (get_apps().get(game_key, {}).get("domain") if game_key else None)
+    send_briefing(days, domain=briefing_domain)
 
 
 def main() -> None:

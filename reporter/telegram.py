@@ -125,12 +125,18 @@ def _compute_app_stat(app_key: str, app_info: dict, domain_records: list[dict]) 
     }
 
 
-def _build_domain_section(domain_info: dict, domain_records: list[dict], app_stats: dict) -> str:
-    """도메인 하나(예: game, health)의 브리핑 섹션 텍스트를 만든다."""
-    header = f"{domain_info.get('emoji', '')} {domain_info['label']} VOC".strip()
+def _build_domain_message(domain_info: dict, domain_records: list[dict]) -> str:
+    """도메인 하나(예: game, health)에 대한 완결된 브리핑 메시지를 만든다."""
+    today = datetime.now().strftime("%Y-%m-%d")
+    header = f"{domain_info.get('emoji', '')} {domain_info['label']} VOC 일일 브리핑 | {today}".strip()
 
     if not domain_records:
-        return f"{header}\n오늘 새로운 리뷰가 없습니다."
+        return f"{header}\n\n오늘 새로운 리뷰가 없습니다."
+
+    app_stats = {
+        app_key: _compute_app_stat(app_key, app_info, domain_records)
+        for app_key, app_info in domain_info["apps"].items()
+    }
 
     risk_lines = "\n".join(
         f"• {info['label']} ({info['genre']}): {_RISK_EMOJI[info['risk']]} {info['risk']}"
@@ -143,7 +149,9 @@ def _build_domain_section(domain_info: dict, domain_records: list[dict], app_sta
         for i, r in enumerate(top3)
     ) or "해당 없음"
 
-    return "\n".join([
+    comment, actions = _generate_ai_comment(app_stats, top3)
+
+    parts = [
         header,
         "",
         "📊 위험등급",
@@ -151,16 +159,7 @@ def _build_domain_section(domain_info: dict, domain_records: list[dict], app_sta
         "",
         "🚨 긴급도 5 이슈 Top3",
         issue_lines,
-    ])
-
-
-def _build_message(sections: list[str], comment: str, actions: str) -> str:
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    parts = [f"📋 VOC 일일 브리핑 | {today}"]
-
-    for section in sections:
-        parts += ["", section]
+    ]
 
     if comment:
         parts += ["", "🤖 AI 코멘트", comment]
@@ -186,7 +185,7 @@ def _send(token: str, chat_id: str, text: str) -> None:
 
 def send_no_review_notice(domain: str | None = None, game: str | None = None) -> None:
     """당일 새 리뷰가 없을 때 텔레그램으로 알린다.
-    domain/game을 지정하면 어느 범위에서 0건이었는지 부제로 명시한다 (미지정 시 전체 범위)."""
+    domain/game을 지정하면 헤더에 어느 범위에서 0건이었는지 명시한다 (미지정 시 전체 범위)."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -196,21 +195,17 @@ def send_no_review_notice(domain: str | None = None, game: str | None = None) ->
 
     today = datetime.now().strftime("%Y-%m-%d")
 
-    sub_header = None
     if game:
         app_info = get_apps().get(game, {})
         domain_info = DOMAINS.get(app_info.get("domain"), {})
-        sub_header = f"{domain_info.get('emoji', '')} {app_info.get('label', game)}".strip()
+        label = f"{domain_info.get('emoji', '')} {app_info.get('label', game)}".strip()
     elif domain:
         domain_info = DOMAINS.get(domain, {})
-        sub_header = f"{domain_info.get('emoji', '')} {domain_info.get('label', domain)} VOC".strip()
-
-    lines = [f"📋 VOC 일일 브리핑 | {today}", ""]
-    if sub_header:
-        lines += [sub_header, "오늘 새로운 리뷰가 없습니다."]
+        label = f"{domain_info.get('emoji', '')} {domain_info.get('label', domain)} VOC".strip()
     else:
-        lines += ["오늘 새로운 리뷰가 없습니다."]
-    text = "\n".join(lines)
+        label = "📋 VOC"
+
+    text = f"{label} 일일 브리핑 | {today}\n\n오늘 새로운 리뷰가 없습니다."
 
     try:
         _send(token, chat_id, text)
@@ -219,8 +214,9 @@ def send_no_review_notice(domain: str | None = None, game: str | None = None) ->
         print(f"[reporter] 텔레그램 발송 실패: {e}")
 
 
-def send_briefing(days: int = 30) -> None:
-    """일일 VOC 브리핑을 텔레그램으로 발송한다."""
+def send_briefing(days: int = 30, domain: str | None = None) -> None:
+    """일일 VOC 브리핑을 도메인별로 각각 텔레그램 메시지로 발송한다 (game → health 순).
+    domain을 지정하면 그 도메인 메시지만 보낸다 (미지정 시 전체 도메인 순서대로 각각 발송)."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -233,24 +229,16 @@ def send_briefing(days: int = 30) -> None:
         print("[reporter] 분석 데이터 없음 — 브리핑 스킵")
         return
 
-    # 도메인별 섹션 + 전체 앱 통계 (도메인에 리뷰가 없어도 섹션은 유지, 스킵하지 않음)
-    sections = []
-    all_app_stats = {}
-    for domain_key, domain_info in DOMAINS.items():
+    domain_keys = [domain] if domain else list(DOMAINS.keys())
+
+    # 도메인에 리뷰가 없어도 그 도메인 메시지는 스킵하지 않고 "새 리뷰 없음"으로 보낸다.
+    for domain_key in domain_keys:
+        domain_info = DOMAINS[domain_key]
         domain_records = [r for r in records if _domain_of(r) == domain_key]
-        app_stats = {
-            app_key: _compute_app_stat(app_key, app_info, domain_records)
-            for app_key, app_info in domain_info["apps"].items()
-        }
-        all_app_stats.update(app_stats)
-        sections.append(_build_domain_section(domain_info, domain_records, app_stats))
+        message = _build_domain_message(domain_info, domain_records)
 
-    top3 = _get_top3(records)
-    comment, actions = _generate_ai_comment(all_app_stats, top3)
-    message = _build_message(sections, comment, actions)
-
-    try:
-        _send(token, chat_id, message)
-        print("[reporter] 텔레그램 브리핑 발송 완료")
-    except Exception as e:
-        print(f"[reporter] 텔레그램 발송 실패: {e}")
+        try:
+            _send(token, chat_id, message)
+            print(f"[reporter] 텔레그램 브리핑 발송 완료 ({domain_key})")
+        except Exception as e:
+            print(f"[reporter] 텔레그램 발송 실패 ({domain_key}): {e}")
