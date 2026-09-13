@@ -225,6 +225,9 @@ python main.py --days 90      # 과거 데이터 소급 수집
 ## 주의사항
 
 - Groq 무료 티어: 분당 30회 요청 제한 (openai/gpt-oss-120b, 분당 토큰 8,000). 배치 처리 시 rate limit 고려.
+  429(TPM 초과) 발생 시 `analyzer/gemini.py`가 배치당 최대 3회, 8초 단위로 늘려가며(8s/16s/24s)
+  자동 재시도한다. 그래도 실패하면 해당 배치는 category/priority가 빈 값으로 저장되므로,
+  429가 잦다면 배치 크기(`_BATCH_SIZE`)를 더 줄이는 것도 고려한다.
 - **모델 교체 이력**: 2026-08 `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` 마이그레이션. Groq의 llama-3.3-70b-versatile 폐기(2026-08-16) 조치에 따른 대응. TPM 한도가 낮아져(12,000→8,000) 배치 크기를 10→6으로 축소. 모델명은 하드코딩하지 않고 `.env`의 `GROQ_MODEL`로 관리한다.
 - google-play-scraper는 비공식 API. Google Play 정책 변경 시 동작 불안정 가능.
 - data/reviews.csv, docs/ 전체(랜딩 + 도메인별 대시보드)는 git에서 추적한다. GitHub Actions가 매일 자동 커밋.

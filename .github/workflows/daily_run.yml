@@ -5,15 +5,15 @@ on:
     - cron: '0 1 * * *'   # 매일 KST 10:00 (UTC 01:00)
   workflow_dispatch:        # 수동 실행 허용
     inputs:
-      game:
-        description: '분석할 게임 (비워두면 전체 실행)'
+      domain:
+        description: '분석할 도메인 (비워두면 game+health 전체 실행)'
         required: false
         default: ''
         type: choice
         options:
           - ''
-          - lineage_m
-          - browndust2
+          - game
+          - health
       days:
         description: '수집할 리뷰 기간 (일)'
         required: false
@@ -39,17 +39,19 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run pipeline
+      - name: Run pipeline (game + health)
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           ARGS=""
-          if [ -n "${{ inputs.game }}" ]; then
-            ARGS="$ARGS --game ${{ inputs.game }}"
+          if [ -n "${{ inputs.domain }}" ]; then
+            ARGS="$ARGS --domain ${{ inputs.domain }}"
           fi
           ARGS="$ARGS --days ${{ inputs.days || '30' }}"
+          # --domain 없이 실행하면 main.py가 config.DOMAINS 순서(game → health)대로
+          # 한 프로세스 안에서 순차 수집·분석·저장하고 브리핑도 한 번만 보낸다.
           python main.py $ARGS
 
       - name: Generate top_issues.csv

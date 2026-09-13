@@ -2,7 +2,7 @@ import json
 import os
 import time
 
-from groq import Groq
+from groq import Groq, RateLimitError
 from dotenv import load_dotenv
 
 from config import get_apps, get_category_specs
@@ -44,6 +44,11 @@ _REQUESTS_PER_MINUTE = 30
 _BATCH_SIZE = 6
 _REQUEST_INTERVAL = 60.0 / _REQUESTS_PER_MINUTE  # 2초
 
+# 429(rate limit) 재시도: TPM 한도는 분 단위로 회복되므로 몇 초 간격으로 재시도한다.
+# 응답의 "in Xms" 안내는 순간적인 토큰 여유만 반영해 실제로는 더 걸릴 때가 많아 신뢰하지 않는다.
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 8.0  # 초, 시도 횟수에 비례해 증가 (8s, 16s, 24s)
+
 
 def _build_prompt(records: list[dict], category_specs: dict[str, str]) -> str:
     reviews = [
@@ -68,13 +73,26 @@ def _parse_response(text: str) -> list[dict]:
     return json.loads(text)
 
 
+def _call_groq(prompt: str):
+    """Groq 호출. 429(rate limit)는 짧게 대기 후 재시도하고, 그래도 안 되면 예외를 올린다."""
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return _client.chat.completions.create(
+                model=_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+            )
+        except RateLimitError as e:
+            if attempt == _MAX_RETRIES:
+                raise
+            wait = _RETRY_BACKOFF * attempt
+            print(f"[analyzer] rate limit(429) — {wait:.0f}초 후 재시도 ({attempt}/{_MAX_RETRIES})")
+            time.sleep(wait)
+
+
 def _analyze_batch(records: list[dict], category_specs: dict[str, str]) -> list[dict]:
     """리뷰 배치를 Groq로 분석하고 결과를 병합한 레코드를 반환한다."""
     prompt = _build_prompt(records, category_specs)
-    response = _client.chat.completions.create(
-        model=_MODEL,
-        messages=[{"role": "user", "content": prompt}],
-    )
+    response = _call_groq(prompt)
     results = _parse_response(response.choices[0].message.content)
 
     if len(results) != len(records):
