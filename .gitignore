@@ -20,3 +20,6 @@ env/
 # OS
 .DS_Store
 Thumbs.db
+
+# 마이그레이션 스크립트가 만드는 백업 파일
+*.bak

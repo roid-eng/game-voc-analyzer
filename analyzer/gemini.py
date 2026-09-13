@@ -5,18 +5,25 @@ import time
 from groq import Groq
 from dotenv import load_dotenv
 
+from config import get_apps, get_category_specs
+
 load_dotenv()
 
 _client = Groq(api_key=os.environ["GROQ_API_KEY"])
 _MODEL = "openai/gpt-oss-120b"
 
-CATEGORIES = ["BM", "밸런스", "강화", "서버", "운영"]
+_APPS = get_apps()
+
 SENTIMENTS = ["부정", "중립", "긍정"]
 
 _PROMPT_TEMPLATE = """\
-아래 게임 리뷰들을 분석하여 JSON 배열로 반환하라.
+아래 리뷰들을 분석하여 JSON 배열로 반환하라.
+
+카테고리 정의 (각 카테고리의 기준을 정확히 구분해서 적용하라):
+{category_specs}
+
 각 항목은 반드시 다음 키를 포함해야 한다:
-- category: 반드시 아래 목록 중 정확히 하나를 그대로 사용 (번역·변형 금지): {categories}
+- category: 위 목록 중 정확히 하나의 이름만 그대로 사용 (번역·변형 금지): {categories}
 - sentiment: {sentiments} 중 하나
 - summary: 리뷰 핵심을 1~2문장으로 요약
 - keywords: 핵심 키워드 3개 이내, 쉼표로 구분한 문자열
@@ -38,13 +45,15 @@ _BATCH_SIZE = 6
 _REQUEST_INTERVAL = 60.0 / _REQUESTS_PER_MINUTE  # 2초
 
 
-def _build_prompt(records: list[dict]) -> str:
+def _build_prompt(records: list[dict], category_specs: dict[str, str]) -> str:
     reviews = [
         {"index": i, "rating": r["rating"], "text": r["review_text"]}
         for i, r in enumerate(records)
     ]
+    specs_text = "\n".join(f"- {name}: {desc}" for name, desc in category_specs.items())
     return _PROMPT_TEMPLATE.format(
-        categories=" / ".join(CATEGORIES),
+        category_specs=specs_text,
+        categories=" / ".join(category_specs.keys()),
         sentiments=" / ".join(SENTIMENTS),
         reviews_json=json.dumps(reviews, ensure_ascii=False, indent=2),
     )
@@ -59,9 +68,9 @@ def _parse_response(text: str) -> list[dict]:
     return json.loads(text)
 
 
-def _analyze_batch(records: list[dict]) -> list[dict]:
+def _analyze_batch(records: list[dict], category_specs: dict[str, str]) -> list[dict]:
     """리뷰 배치를 Groq로 분석하고 결과를 병합한 레코드를 반환한다."""
-    prompt = _build_prompt(records)
+    prompt = _build_prompt(records, category_specs)
     response = _client.chat.completions.create(
         model=_MODEL,
         messages=[{"role": "user", "content": prompt}],
@@ -86,24 +95,35 @@ def _analyze_batch(records: list[dict]) -> list[dict]:
     return merged
 
 
+def _group_by_domain(records: list[dict]) -> dict[str, list[dict]]:
+    """레코드를 앱(game 컬럼) 기준으로 소속 도메인별로 묶는다 (입력 순서 유지)."""
+    groups: dict[str, list[dict]] = {}
+    for r in records:
+        domain = _APPS[r["game"]]["domain"]
+        groups.setdefault(domain, []).append(r)
+    return groups
+
+
 def analyze(records: list[dict]) -> list[dict]:
-    """수집된 리뷰 레코드 전체를 배치 단위로 분석한다."""
+    """수집된 리뷰 레코드 전체를 도메인별 카테고리를 반영해 배치 단위로 분석한다."""
+    batches = []
+    for domain, group in _group_by_domain(records).items():
+        category_specs = get_category_specs(domain)
+        for i in range(0, len(group), _BATCH_SIZE):
+            batches.append((domain, category_specs, group[i: i + _BATCH_SIZE]))
+
     analyzed = []
-    total = len(records)
+    total_batches = len(batches)
 
-    for i in range(0, total, _BATCH_SIZE):
-        batch = records[i: i + _BATCH_SIZE]
-        batch_num = i // _BATCH_SIZE + 1
-        total_batches = (total + _BATCH_SIZE - 1) // _BATCH_SIZE
-
-        print(f"[analyzer] 배치 {batch_num}/{total_batches} 분석 중... ({len(batch)}건)")
+    for idx, (domain, category_specs, batch) in enumerate(batches, start=1):
+        print(f"[analyzer] 배치 {idx}/{total_batches} 분석 중... ({domain}, {len(batch)}건)")
 
         try:
-            result = _analyze_batch(batch)
+            result = _analyze_batch(batch, category_specs)
             analyzed.extend(result)
-            print(f"[analyzer] 배치 {batch_num} 완료")
+            print(f"[analyzer] 배치 {idx} 완료")
         except Exception as e:
-            print(f"[analyzer] 배치 {batch_num} 실패: {e}")
+            print(f"[analyzer] 배치 {idx} 실패: {e}")
             for record in batch:
                 analyzed.append({
                     **record,
@@ -114,7 +134,7 @@ def analyze(records: list[dict]) -> list[dict]:
                     "priority": 0,
                 })
 
-        if i + _BATCH_SIZE < total:
+        if idx < total_batches:
             time.sleep(_REQUEST_INTERVAL)
 
     return analyzed

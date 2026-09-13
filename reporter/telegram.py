@@ -9,12 +9,19 @@ from pathlib import Path
 from groq import Groq
 from dotenv import load_dotenv
 
+from config import DOMAINS, get_apps
+
 load_dotenv()
 
 _CSV_PATH = Path("data/reviews.csv")
 _MODEL = "openai/gpt-oss-120b"
 
 _RISK_EMOJI = {"HIGH": "🔴", "MID": "🟡", "LOW": "🟢"}
+
+
+def _domain_of(row: dict) -> str:
+    """domain 컬럼이 없는 과거 행은 game 도메인으로 간주한다 (마이그레이션 전 데이터 호환)."""
+    return row.get("domain") or "game"
 
 
 def _load_recent(days: int = 30) -> list[dict]:
@@ -105,28 +112,55 @@ JSON만 출력하라."""
         return f"AI 코멘트 생성 실패: {e}", ""
 
 
-def _build_message(game_stats: dict, top3: list[dict], comment: str, actions: str) -> str:
-    today = datetime.now().strftime("%Y-%m-%d")
+def _compute_app_stat(app_key: str, app_info: dict, domain_records: list[dict]) -> dict:
+    """도메인 레코드 중 앱 하나에 대한 위험등급/평균긴급도/건수를 계산한다."""
+    app_records = [r for r in domain_records if r["game"] == app_key and r["priority"] > 0]
+    avg = sum(r["priority"] for r in app_records) / len(app_records) if app_records else 0
+    return {
+        "label": app_info.get("label", app_key),
+        "genre": app_info["genre"],
+        "risk": _calc_risk(domain_records, app_key),
+        "avg_priority": avg,
+        "count": len(app_records),
+    }
+
+
+def _build_domain_section(domain_info: dict, domain_records: list[dict], app_stats: dict) -> str:
+    """도메인 하나(예: game, health)의 브리핑 섹션 텍스트를 만든다."""
+    header = f"{domain_info.get('emoji', '')} {domain_info['label']} VOC".strip()
+
+    if not domain_records:
+        return f"{header}\n오늘 새로운 리뷰가 없습니다."
 
     risk_lines = "\n".join(
         f"• {info['label']} ({info['genre']}): {_RISK_EMOJI[info['risk']]} {info['risk']}"
-        for info in game_stats.values()
+        for info in app_stats.values()
     )
 
+    top3 = _get_top3(domain_records)
     issue_lines = "\n".join(
         f"{i+1}. [{r['game']} · {r['category']}] {r.get('summary', r.get('review_text', ''))[:50]}"
         for i, r in enumerate(top3)
     ) or "해당 없음"
 
-    parts = [
-        f"🎮 게임 VOC 일일 브리핑 | {today}",
+    return "\n".join([
+        header,
         "",
         "📊 위험등급",
         risk_lines,
         "",
         "🚨 긴급도 5 이슈 Top3",
         issue_lines,
-    ]
+    ])
+
+
+def _build_message(sections: list[str], comment: str, actions: str) -> str:
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    parts = [f"📋 VOC 일일 브리핑 | {today}"]
+
+    for section in sections:
+        parts += ["", section]
 
     if comment:
         parts += ["", "🤖 AI 코멘트", comment]
@@ -150,8 +184,9 @@ def _send(token: str, chat_id: str, text: str) -> None:
         raise RuntimeError(f"Telegram 발송 실패: {result}")
 
 
-def send_no_review_notice() -> None:
-    """당일 새 리뷰가 없을 때 텔레그램으로 알린다."""
+def send_no_review_notice(domain: str | None = None, game: str | None = None) -> None:
+    """당일 새 리뷰가 없을 때 텔레그램으로 알린다.
+    domain/game을 지정하면 어느 범위에서 0건이었는지 부제로 명시한다 (미지정 시 전체 범위)."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -160,7 +195,23 @@ def send_no_review_notice() -> None:
         return
 
     today = datetime.now().strftime("%Y-%m-%d")
-    text = f"🎮 게임 VOC 일일 브리핑 | {today}\n\n오늘 새로운 리뷰가 없습니다."
+
+    sub_header = None
+    if game:
+        app_info = get_apps().get(game, {})
+        domain_info = DOMAINS.get(app_info.get("domain"), {})
+        sub_header = f"{domain_info.get('emoji', '')} {app_info.get('label', game)}".strip()
+    elif domain:
+        domain_info = DOMAINS.get(domain, {})
+        sub_header = f"{domain_info.get('emoji', '')} {domain_info.get('label', domain)} VOC".strip()
+
+    lines = [f"📋 VOC 일일 브리핑 | {today}", ""]
+    if sub_header:
+        lines += [sub_header, "오늘 새로운 리뷰가 없습니다."]
+    else:
+        lines += ["오늘 새로운 리뷰가 없습니다."]
+    text = "\n".join(lines)
+
     try:
         _send(token, chat_id, text)
         print("[reporter] 텔레그램 '새 리뷰 없음' 알림 발송 완료")
@@ -182,23 +233,21 @@ def send_briefing(days: int = 30) -> None:
         print("[reporter] 분석 데이터 없음 — 브리핑 스킵")
         return
 
-    # 게임별 통계
-    from config import GAMES
-    game_stats = {}
-    for game_key, game_info in GAMES.items():
-        game_records = [r for r in records if r["game"] == game_key and r["priority"] > 0]
-        avg = sum(r["priority"] for r in game_records) / len(game_records) if game_records else 0
-        game_stats[game_key] = {
-            "label": game_info.get("label", game_key),
-            "genre": game_info["genre"],
-            "risk": _calc_risk(records, game_key),
-            "avg_priority": avg,
-            "count": len(game_records),
+    # 도메인별 섹션 + 전체 앱 통계 (도메인에 리뷰가 없어도 섹션은 유지, 스킵하지 않음)
+    sections = []
+    all_app_stats = {}
+    for domain_key, domain_info in DOMAINS.items():
+        domain_records = [r for r in records if _domain_of(r) == domain_key]
+        app_stats = {
+            app_key: _compute_app_stat(app_key, app_info, domain_records)
+            for app_key, app_info in domain_info["apps"].items()
         }
+        all_app_stats.update(app_stats)
+        sections.append(_build_domain_section(domain_info, domain_records, app_stats))
 
     top3 = _get_top3(records)
-    comment, actions = _generate_ai_comment(game_stats, top3)
-    message = _build_message(game_stats, top3, comment, actions)
+    comment, actions = _generate_ai_comment(all_app_stats, top3)
+    message = _build_message(sections, comment, actions)
 
     try:
         _send(token, chat_id, message)

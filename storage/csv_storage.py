@@ -6,18 +6,24 @@ DATA_DIR = Path("data")
 CSV_PATH = DATA_DIR / "reviews.csv"
 
 COLUMNS = [
-    "date", "game", "genre", "review_id", "rating",
+    "date", "domain", "game", "genre", "review_id", "rating",
     "review_text", "category", "sentiment", "summary", "keywords", "priority",
 ]
 
 
-def _get_existing_ids() -> set[str]:
-    """CSV에서 이미 저장된 review_id 집합을 반환한다."""
+def _domain_of(row: dict) -> str:
+    """domain 컬럼이 없는 과거 행은 game 도메인으로 간주한다 (마이그레이션 전 데이터 호환)."""
+    return row.get("domain") or "game"
+
+
+def _get_existing_ids() -> set[tuple[str, str]]:
+    """CSV에서 이미 저장된 (domain, review_id) 집합을 반환한다.
+    도메인이 다르면 review_id가 우연히 같아도 별개 리뷰로 취급한다."""
     if not CSV_PATH.exists():
         return set()
     with CSV_PATH.open(encoding="utf-8", newline="") as f:
         reader = csv.DictReader(f)
-        return {row["review_id"] for row in reader if row.get("review_id")}
+        return {(_domain_of(row), row["review_id"]) for row in reader if row.get("review_id")}
 
 
 def save(records: list[dict]) -> None:
@@ -29,7 +35,7 @@ def save(records: list[dict]) -> None:
     DATA_DIR.mkdir(exist_ok=True)
 
     existing_ids = _get_existing_ids()
-    new_records = [r for r in records if r["review_id"] not in existing_ids]
+    new_records = [r for r in records if (_domain_of(r), r["review_id"]) not in existing_ids]
 
     skipped = len(records) - len(new_records)
     if not new_records:

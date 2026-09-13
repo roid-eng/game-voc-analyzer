@@ -3,203 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>게임 VOC 분석 대시보드</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<title>VOC 자동분석 프레임워크</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
-header { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
-header h1 { font-size: 1.5rem; font-weight: 700; }
-header p { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
-.container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
-.row { display: grid; gap: 16px; margin-bottom: 24px; }
-.row-3 { grid-template-columns: 1fr 1fr 1fr; }
-.row-1 { grid-template-columns: 1fr; }
-.row-2 { grid-template-columns: 1fr 1fr; }
-.card { background: #1e293b; border-radius: 12px; padding: 20px; }
-.card h2 { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
-.risk-value { font-size: 2.2rem; font-weight: 800; }
-.stat-value { font-size: 2.5rem; font-weight: 800; color: #38bdf8; }
-.chart-wrap { position: relative; height: 260px; }
-.chart-wrap-lg { position: relative; height: 300px; }
-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-th { text-align: left; padding: 10px 12px; background: #0f172a; color: #94a3b8; font-weight: 600; }
-td { padding: 10px 12px; border-top: 1px solid #0f172a; vertical-align: top; }
-tr:hover td { background: #263348; }
-.badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
-.p5 { background: #450a0a; color: #fca5a5; }
-.p4 { background: #431407; color: #fdba74; }
-.empty { text-align: center; color: #64748b; padding: 24px; }
-@media (max-width: 768px) {
-  .row-3, .row-2 { grid-template-columns: 1fr; }
-  .container { padding: 16px; }
+body {
+  font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0;
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+  padding: 64px 24px;
 }
+.hero { text-align: center; max-width: 640px; margin-bottom: 48px; }
+.hero h1 { font-size: 2rem; font-weight: 800; margin-bottom: 12px; }
+.hero p { color: #94a3b8; font-size: 0.95rem; line-height: 1.6; }
+.hero .updated { margin-top: 12px; font-size: 0.8rem; color: #64748b; }
+.cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
+  gap: 24px; justify-content: center; width: 100%; max-width: 720px;
+}
+.domain-card {
+  background: #1e293b; border-radius: 16px; padding: 32px 24px; text-align: center;
+  text-decoration: none; color: inherit; border: 1px solid #263348;
+  border-top: 4px solid var(--accent, #38bdf8);
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.domain-card:hover { transform: translateY(-4px); background: #263348; }
+.domain-emoji { font-size: 2.5rem; margin-bottom: 12px; }
+.domain-card h2 { font-size: 1.2rem; font-weight: 700; margin-bottom: 8px; }
+.domain-card .apps { font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px; }
+.domain-card .meta { font-size: 0.8rem; color: #64748b; }
 </style>
 </head>
 <body>
-<header>
-  <h1>🎮 게임 VOC 분석 대시보드</h1>
-  <p>마지막 업데이트: 2026-09-13 &nbsp;|&nbsp; 리니지M · 브라운더스트2</p>
-</header>
-<div class="container">
-
-  <!-- Row 1: 요약 카드 -->
-  <div class="row row-3">
-    <div class="card">
-      <h2>리니지M 위험등급</h2>
-      <div class="risk-value" style="color:#f59e0b">MID</div>
-    </div>
-    <div class="card">
-      <h2>브라운더스트2 위험등급</h2>
-      <div class="risk-value" style="color:#f59e0b">MID</div>
-    </div>
-    <div class="card">
-      <h2>이번 주 총 리뷰</h2>
-      <div class="stat-value">13건</div>
-    </div>
+  <div class="hero">
+    <h1>VOC 자동분석 프레임워크</h1>
+    <p>Google Play 리뷰를 자동 수집·분석해 도메인별 플레이어/사용자 VOC 현황을 대시보드로 제공합니다.
+    아래 카드를 눌러 도메인별 대시보드로 이동하세요.</p>
+    <p class="updated">마지막 업데이트: 2026-09-13</p>
   </div>
+  <div class="cards">
 
-  <!-- Row 2: 일별 트렌드 -->
-  <div class="row row-1">
-    <div class="card">
-      <h2>최근 30일 일별 리뷰 추이</h2>
-      <div class="chart-wrap-lg"><canvas id="trendChart"></canvas></div>
-    </div>
+    <a class="domain-card" href="game/index.html" style="--accent:#f59e0b">
+      <div class="domain-emoji">🎮</div>
+      <h2>게임 VOC</h2>
+      <p class="apps">리니지M · 브라운더스트2</p>
+      <p class="meta">총 805건 · 위험등급 <span style="color:#f59e0b">MID</span></p>
+    </a>
+
+    <a class="domain-card" href="health/index.html" style="--accent:#22c55e">
+      <div class="domain-emoji">💊</div>
+      <h2>헬스 VOC</h2>
+      <p class="apps">삼성헬스</p>
+      <p class="meta">총 0건 · 위험등급 <span style="color:#22c55e">LOW</span></p>
+    </a>
   </div>
-
-  <!-- Row 3: 파이 차트 -->
-  <div class="row row-2">
-    <div class="card">
-      <h2>카테고리 분포 (전체)</h2>
-      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>감성 분포 (전체)</h2>
-      <div class="chart-wrap"><canvas id="sentimentChart"></canvas></div>
-    </div>
-  </div>
-
-  <!-- Row 4: 막대 차트 -->
-  <div class="row row-2">
-    <div class="card">
-      <h2>게임별 카테고리 비교</h2>
-      <div class="chart-wrap"><canvas id="gameCategoryChart"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>긴급도별 분포</h2>
-      <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
-    </div>
-  </div>
-
-  <!-- Row 5: 긴급 이슈 테이블 -->
-  <div class="row row-1">
-    <div class="card">
-      <h2>이번 주 긴급 이슈 (긴급도 4~5)</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>게임</th><th>카테고리</th><th>긴급도</th><th>요약</th><th>키워드</th>
-          </tr>
-        </thead>
-        <tbody id="urgentBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
-<script>
-const D = {"updated": "2026-09-13", "risk": {"lineage_m": "MID", "browndust2": "MID"}, "week_total": 13, "trend": {"dates": ["2026-08-15", "2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"], "lineage_m": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "browndust2": [3, 2, 2, 0, 0, 0, 2, 1, 0, 0, 3, 2, 5, 1, 2, 0, 1, 1, 0, 2, 2, 0, 1, 2, 0, 2, 3, 4, 1, 0]}, "category": {"labels": ["밸런스", "BM", "강화", "서버", "운영"], "values": [120, 210, 81, 136, 220]}, "sentiment": {"labels": ["긍정", "부정", "중립"], "values": [377, 302, 99]}, "game_category": {"labels": ["BM", "밸런스", "강화", "서버", "운영"], "lineage_m": [30, 15, 15, 29, 18], "browndust2": [180, 105, 66, 107, 202]}, "priority": {"labels": ["긴급도 1", "긴급도 2", "긴급도 3", "긴급도 4", "긴급도 5"], "values": [264, 134, 96, 98, 200]}, "urgent_table": [{"game": "브라운더스트2", "category": "강화", "summary": "개선은 되었지만 중복 무기 문제와 UR 장비를 SR로 교환해 주길 바라는 목소리가 남아 있다.", "keywords": "중복무기,UR장비,교환", "priority": 5}, {"game": "브라운더스트2", "category": "밸런스", "summary": "밸런스가 맞지 않아 특정 덱만으로 클리어가 가능하고, 운에 의존하게 되어 게임을 포기하게 되었습니다.", "keywords": "밸런스, 특정덱, 시간낭비", "priority": 5}, {"game": "브라운더스트2", "category": "밸런스", "summary": "무기와 캐릭터 성장 한계가 있어 스토리 진행이 어려워 밸런스 개선을 요구합니다.", "keywords": "무기 강화, 성장 한계, 스토리 난이도", "priority": 5}, {"game": "브라운더스트2", "category": "운영", "summary": "백그라운드 음악이 끊기고 업데이트 시 용량이 크게 늘어 불편함을 호소합니다.", "keywords": "음악 끊김, 용량 증가, 최적화", "priority": 4}]};
-const GRID = '#263348';
-Chart.defaults.color = '#94a3b8';
-Chart.defaults.font.family = "'Segoe UI', sans-serif";
-
-// 트렌드
-new Chart(document.getElementById('trendChart'), {
-  type: 'line',
-  data: {
-    labels: D.trend.dates,
-    datasets: [
-      { label: '리니지M', data: D.trend.lineage_m, borderColor: '#f472b6', backgroundColor: 'rgba(244,114,182,0.08)', tension: 0.3, fill: true, pointRadius: 3 },
-      { label: '브라운더스트2', data: D.trend.browndust2, borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.08)', tension: 0.3, fill: true, pointRadius: 3 },
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { position: 'top' } },
-    scales: {
-      x: { grid: { color: GRID }, ticks: { maxTicksLimit: 10 } },
-      y: { grid: { color: GRID }, beginAtZero: true }
-    }
-  }
-});
-
-// 카테고리 도넛
-new Chart(document.getElementById('categoryChart'), {
-  type: 'doughnut',
-  data: {
-    labels: D.category.labels,
-    datasets: [{ data: D.category.values, backgroundColor: ['#f472b6','#818cf8','#34d399','#fbbf24','#f87171','#a78bfa'] }]
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-});
-
-// 감성 도넛
-new Chart(document.getElementById('sentimentChart'), {
-  type: 'doughnut',
-  data: {
-    labels: D.sentiment.labels,
-    datasets: [{ data: D.sentiment.values, backgroundColor: ['#f87171','#94a3b8','#34d399','#64748b'] }]
-  },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
-});
-
-// 게임별 카테고리 막대
-new Chart(document.getElementById('gameCategoryChart'), {
-  type: 'bar',
-  data: {
-    labels: D.game_category.labels,
-    datasets: [
-      { label: '리니지M', data: D.game_category.lineage_m, backgroundColor: '#f472b6' },
-      { label: '브라운더스트2', data: D.game_category.browndust2, backgroundColor: '#38bdf8' },
-    ]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { position: 'top' } },
-    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
-  }
-});
-
-// 긴급도 막대
-new Chart(document.getElementById('priorityChart'), {
-  type: 'bar',
-  data: {
-    labels: D.priority.labels,
-    datasets: [{ label: '건수', data: D.priority.values, backgroundColor: ['#34d399','#6ee7b7','#fbbf24','#f97316','#ef4444'] }]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { display: false } },
-    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
-  }
-});
-
-// 긴급 이슈 테이블
-const tbody = document.getElementById('urgentBody');
-if (D.urgent_table.length === 0) {
-  tbody.innerHTML = '<tr><td colspan="5" class="empty">이번 주 긴급 이슈 없음</td></tr>';
-} else {
-  D.urgent_table.forEach(r => {
-    const cls = r.priority === 5 ? 'p5' : 'p4';
-    tbody.innerHTML += `<tr>
-      <td>${r.game}</td>
-      <td>${r.category}</td>
-      <td><span class="badge ${cls}">${r.priority}</span></td>
-      <td>${r.summary}</td>
-      <td style="color:#94a3b8;font-size:0.8rem">${r.keywords}</td>
-    </tr>`;
-  });
-}
-</script>
 </body>
 </html>

@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>헬스 VOC 분석 대시보드</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; }
+header { padding: 24px 32px; border-bottom: 1px solid #1e293b; }
+.back-link { display: inline-block; color: #38bdf8; font-size: 0.85rem; text-decoration: none; margin-bottom: 8px; }
+.back-link:hover { text-decoration: underline; }
+header h1 { font-size: 1.5rem; font-weight: 700; }
+header p { font-size: 0.85rem; color: #94a3b8; margin-top: 4px; }
+.container { max-width: 1200px; margin: 0 auto; padding: 24px 32px; }
+.row { display: grid; gap: 16px; margin-bottom: 24px; }
+.row-cards { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.row-1 { grid-template-columns: 1fr; }
+.row-2 { grid-template-columns: 1fr 1fr; }
+.card { background: #1e293b; border-radius: 12px; padding: 20px; }
+.card h2 { font-size: 0.8rem; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 16px; }
+.risk-value { font-size: 2.2rem; font-weight: 800; }
+.stat-value { font-size: 2.5rem; font-weight: 800; color: #38bdf8; }
+.chart-wrap { position: relative; height: 260px; }
+.chart-wrap-lg { position: relative; height: 300px; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th { text-align: left; padding: 10px 12px; background: #0f172a; color: #94a3b8; font-weight: 600; }
+td { padding: 10px 12px; border-top: 1px solid #0f172a; vertical-align: top; }
+tr:hover td { background: #263348; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; }
+.p5 { background: #450a0a; color: #fca5a5; }
+.p4 { background: #431407; color: #fdba74; }
+.empty { text-align: center; color: #64748b; padding: 24px; }
+@media (max-width: 768px) {
+  .row-2 { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="back-link" href="../index.html">← 홈</a>
+  <h1>💊 헬스 VOC 분석 대시보드</h1>
+  <p>마지막 업데이트: 2026-09-13 &nbsp;|&nbsp; 삼성헬스</p>
+</header>
+<div class="container">
+
+  <!-- Row 1: 요약 카드 -->
+  <div class="row row-cards">
+    <div class="card">
+      <h2>삼성헬스 위험등급</h2>
+      <div class="risk-value" style="color:#22c55e">LOW</div>
+    </div>
+    <div class="card">
+      <h2>이번 주 총 리뷰</h2>
+      <div class="stat-value">0건</div>
+    </div>
+  </div>
+
+  <!-- Row 2: 일별 트렌드 -->
+  <div class="row row-1">
+    <div class="card">
+      <h2>최근 30일 일별 리뷰 추이</h2>
+      <div class="chart-wrap-lg"><canvas id="trendChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 3: 파이 차트 -->
+  <div class="row row-2">
+    <div class="card">
+      <h2>카테고리 분포 (전체)</h2>
+      <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>감성 분포 (전체)</h2>
+      <div class="chart-wrap"><canvas id="sentimentChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 4: 막대 차트 -->
+  <div class="row row-2">
+    <div class="card">
+      <h2>앱별 카테고리 비교</h2>
+      <div class="chart-wrap"><canvas id="appCategoryChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>긴급도별 분포</h2>
+      <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Row 5: 긴급 이슈 테이블 -->
+  <div class="row row-1">
+    <div class="card">
+      <h2>이번 주 긴급 이슈 (긴급도 4~5)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>앱</th><th>카테고리</th><th>긴급도</th><th>요약</th><th>키워드</th>
+          </tr>
+        </thead>
+        <tbody id="urgentBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+<script>
+const D = {"updated": "2026-09-13", "apps": {"samsung_health": "삼성헬스"}, "risk": {"samsung_health": "LOW"}, "week_total": 0, "total": 0, "trend": {"dates": ["2026-08-15", "2026-08-16", "2026-08-17", "2026-08-18", "2026-08-19", "2026-08-20", "2026-08-21", "2026-08-22", "2026-08-23", "2026-08-24", "2026-08-25", "2026-08-26", "2026-08-27", "2026-08-28", "2026-08-29", "2026-08-30", "2026-08-31", "2026-09-01", "2026-09-02", "2026-09-03", "2026-09-04", "2026-09-05", "2026-09-06", "2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"], "series": {"samsung_health": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}}, "category": {"labels": [], "values": []}, "sentiment": {"labels": [], "values": []}, "app_category": {"labels": ["데이터정확도", "앱안정성", "UX/UI", "구독과금", "알림개인정보", "운영대응"], "series": {"samsung_health": [0, 0, 0, 0, 0, 0]}}, "priority": {"labels": ["긴급도 1", "긴급도 2", "긴급도 3", "긴급도 4", "긴급도 5"], "values": [0, 0, 0, 0, 0]}, "urgent_table": []};
+const PALETTE = ["#f472b6", "#38bdf8", "#34d399", "#fbbf24", "#a78bfa", "#f87171"];
+const GRID = '#263348';
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.font.family = "'Segoe UI', sans-serif";
+
+// 트렌드
+const trendDatasets = Object.entries(D.trend.series).map(([key, data], i) => ({
+  label: D.apps[key] || key,
+  data,
+  borderColor: PALETTE[i % PALETTE.length],
+  backgroundColor: PALETTE[i % PALETTE.length] + '14',
+  tension: 0.3, fill: true, pointRadius: 3
+}));
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: { labels: D.trend.dates, datasets: trendDatasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: {
+      x: { grid: { color: GRID }, ticks: { maxTicksLimit: 10 } },
+      y: { grid: { color: GRID }, beginAtZero: true }
+    }
+  }
+});
+
+// 카테고리 도넛
+new Chart(document.getElementById('categoryChart'), {
+  type: 'doughnut',
+  data: {
+    labels: D.category.labels,
+    datasets: [{ data: D.category.values, backgroundColor: PALETTE.concat(['#818cf8','#64748b']) }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+});
+
+// 감성 도넛
+new Chart(document.getElementById('sentimentChart'), {
+  type: 'doughnut',
+  data: {
+    labels: D.sentiment.labels,
+    datasets: [{ data: D.sentiment.values, backgroundColor: ['#f87171','#94a3b8','#34d399','#64748b'] }]
+  },
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right' } } }
+});
+
+// 앱별 카테고리 막대
+const appCategoryDatasets = Object.entries(D.app_category.series).map(([key, data], i) => ({
+  label: D.apps[key] || key,
+  data,
+  backgroundColor: PALETTE[i % PALETTE.length]
+}));
+new Chart(document.getElementById('appCategoryChart'), {
+  type: 'bar',
+  data: { labels: D.app_category.labels, datasets: appCategoryDatasets },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'top' } },
+    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
+  }
+});
+
+// 긴급도 막대
+new Chart(document.getElementById('priorityChart'), {
+  type: 'bar',
+  data: {
+    labels: D.priority.labels,
+    datasets: [{ label: '건수', data: D.priority.values, backgroundColor: ['#34d399','#6ee7b7','#fbbf24','#f97316','#ef4444'] }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { x: { grid: { color: GRID } }, y: { grid: { color: GRID }, beginAtZero: true } }
+  }
+});
+
+// 긴급 이슈 테이블
+const tbody = document.getElementById('urgentBody');
+if (D.urgent_table.length === 0) {
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">이번 주 긴급 이슈 없음</td></tr>';
+} else {
+  D.urgent_table.forEach(r => {
+    const cls = r.priority === 5 ? 'p5' : 'p4';
+    tbody.innerHTML += `<tr>
+      <td>${r.app}</td>
+      <td>${r.category}</td>
+      <td><span class="badge ${cls}">${r.priority}</span></td>
+      <td>${r.summary}</td>
+      <td style="color:#94a3b8;font-size:0.8rem">${r.keywords}</td>
+    </tr>`;
+  });
+}
+</script>
+</body>
+</html>
