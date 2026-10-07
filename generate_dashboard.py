@@ -69,7 +69,8 @@ def build_domain_data(domain_key: str, rows: list[dict]) -> dict:
     week_rows = [r for r in domain_rows if r.get("date", "") >= week_ago]
     month_rows = [r for r in domain_rows if r.get("date", "") >= month_ago]
 
-    risk = {app_key: calc_risk(domain_rows, app_key) for app_key in apps}
+    # 위험등급은 현재 상태 지표이므로 텔레그램 브리핑과 같은 최근 30일 기준으로 계산한다.
+    risk = {app_key: calc_risk(month_rows, app_key) for app_key in apps}
 
     dates_30 = [(today - timedelta(days=i)).strftime("%Y-%m-%d") for i in range(29, -1, -1)]
     daily = defaultdict(lambda: defaultdict(int))
@@ -121,6 +122,8 @@ def build_domain_data(domain_key: str, rows: list[dict]) -> dict:
 
     return {
         "updated": today.strftime("%Y-%m-%d"),
+        "period": f"{month_ago} ~ {today.strftime('%Y-%m-%d')}",
+        "month_total": len(month_rows),
         "apps": {app_key: app_info.get("label", app_key) for app_key, app_info in apps.items()},
         "risk": risk,
         "week_total": len(week_rows),
@@ -174,7 +177,7 @@ def generate_domain_html(domain_info: dict, d: dict) -> str:
 
     risk_cards = "\n".join(
         f'''    <div class="card">
-      <h2>{label} 위험등급</h2>
+      <h2>{label} 위험등급 (최근 30일)</h2>
       <div class="risk-value" style="color:{RISK_COLOR[d['risk'][app_key]]}">{d['risk'][app_key]}</div>
     </div>'''
         for app_key, label in app_labels.items()
@@ -197,7 +200,8 @@ def generate_domain_html(domain_info: dict, d: dict) -> str:
 <header>
   <a class="back-link" href="../index.html">← 홈</a>
   <h1>{emoji} {label} VOC 분석 대시보드</h1>
-  <p>마지막 업데이트: {d["updated"]} &nbsp;|&nbsp; {apps_desc}</p>
+  <p>기간: {d["period"]} (최근 30일, 리뷰 작성일 기준 · {d["month_total"]}건) &nbsp;|&nbsp; {apps_desc}</p>
+  <p>마지막 업데이트: {d["updated"]} &nbsp;|&nbsp; 위험등급·트렌드는 최근 30일, 분포 차트는 전체 누적 {d["total"]}건 기준</p>
 </header>
 <div class="container">
 
@@ -205,7 +209,7 @@ def generate_domain_html(domain_info: dict, d: dict) -> str:
   <div class="row row-cards">
 {risk_cards}
     <div class="card">
-      <h2>이번 주 총 리뷰</h2>
+      <h2>최근 7일 리뷰</h2>
       <div class="stat-value">{d["week_total"]}건</div>
     </div>
   </div>
@@ -233,11 +237,11 @@ def generate_domain_html(domain_info: dict, d: dict) -> str:
   <!-- Row 4: 막대 차트 -->
   <div class="row row-2">
     <div class="card">
-      <h2>앱별 카테고리 비교</h2>
+      <h2>앱별 카테고리 비교 (전체 누적)</h2>
       <div class="chart-wrap"><canvas id="appCategoryChart"></canvas></div>
     </div>
     <div class="card">
-      <h2>긴급도별 분포</h2>
+      <h2>긴급도별 분포 (전체 누적)</h2>
       <div class="chart-wrap"><canvas id="priorityChart"></canvas></div>
     </div>
   </div>
@@ -245,7 +249,7 @@ def generate_domain_html(domain_info: dict, d: dict) -> str:
   <!-- Row 5: 긴급 이슈 테이블 -->
   <div class="row row-1">
     <div class="card">
-      <h2>이번 주 긴급 이슈 (긴급도 4~5)</h2>
+      <h2>최근 7일 긴급 이슈 (긴급도 4~5)</h2>
       <table>
         <thead>
           <tr>
@@ -339,7 +343,7 @@ new Chart(document.getElementById('priorityChart'), {{
 // 긴급 이슈 테이블
 const tbody = document.getElementById('urgentBody');
 if (D.urgent_table.length === 0) {{
-  tbody.innerHTML = '<tr><td colspan="5" class="empty">이번 주 긴급 이슈 없음</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="5" class="empty">최근 7일 긴급 이슈 없음</td></tr>';
 }} else {{
   D.urgent_table.forEach(r => {{
     const cls = r.priority === 5 ? 'p5' : 'p4';
@@ -380,7 +384,7 @@ def generate_landing_html(summaries: dict[str, dict]) -> str:
       <div class="domain-emoji">{emoji}</div>
       <h2>{label} VOC</h2>
       <p class="apps">{apps_desc}</p>
-      <p class="meta">총 {s.get("total", 0)}건 · 위험등급 <span style="color:{color}">{worst}</span></p>
+      <p class="meta">누적 {s.get("total", 0)}건 · 위험등급(최근 30일) <span style="color:{color}">{worst}</span></p>
     </a>''')
     cards_html = "\n".join(cards)
 

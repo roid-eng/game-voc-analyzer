@@ -63,33 +63,43 @@ def _get_top3(records: list[dict]) -> list[dict]:
     return p5[:3]
 
 
-def _generate_ai_comment(game_stats: dict, top3: list[dict]) -> tuple[str, str]:
-    """Groq로 AI 코멘트와 권장 액션을 생성한다. (코멘트, 액션) 반환."""
+def _generate_ai_comment(domain_info: dict, game_stats: dict, top3: list[dict], period: str) -> tuple[str, str]:
+    """Groq로 코멘트와 의견을 생성한다. (코멘트, 의견) 반환."""
     api_key = os.environ.get("GROQ_API_KEY")
     if not api_key:
-        return "AI 코멘트 생성 불가 (GROQ_API_KEY 없음)", ""
+        return "코멘트 생성 불가 (GROQ_API_KEY 없음)", ""
 
+    apps = domain_info["apps"]
     stats_text = "\n".join(
-        f"- {game}: 위험등급 {info['risk']}, 평균 긴급도 {info['avg_priority']:.1f}, 총 {info['count']}건"
-        for game, info in game_stats.items()
+        f"- {info['label']}: 불만 강도 등급 {info['risk']}, 평균 긴급도 {info['avg_priority']:.1f}, 리뷰 {info['count']}건"
+        for info in game_stats.values()
     )
     issues_text = "\n".join(
-        f"{i+1}. [{r['game']} · {r['category']}] {r.get('summary', r.get('review_text', ''))[:60]}"
+        f"{i+1}. [{apps.get(r['game'], {}).get('label', r['game'])} · {r['category']}] "
+        f"{r.get('summary', r.get('review_text', ''))[:60]}"
         for i, r in enumerate(top3)
     )
 
-    prompt = f"""다음은 게임 VOC 분석 결과다. 운영 PM을 위한 브리핑을 작성하라.
+    prompt = f"""다음은 {domain_info['label']} 도메인 앱의 Google Play 사용자 리뷰를 분석한 결과다. 운영 PM을 위한 브리핑을 작성하라.
 
-[게임별 현황]
+[분석 기간] {period}
+
+[앱별 현황]
 {stats_text}
 
-[긴급도 높은 이슈]
+[불만 강도가 높게 분류된 리뷰]
 {issues_text}
+
+[작성 지침]
+- 위 등급과 긴급도는 사용자 리뷰 내용을 AI가 추정한 점수일 뿐, 실제 장애나 사고가 확인된 것이 아니다.
+  "심각한 문제가 발생했다", "장애", "위기" 같은 단정적 표현은 쓰지 말고, "~라는 불만이 많다", "~에 대한 의견이 관찰된다"처럼 사용자 반응 중심으로 서술하라.
+- 앱 이름은 위에 적힌 한글 표기를 그대로 사용하라 (영문 키나 변형 표기 금지).
+- 의견은 PM이 검토해볼 만한 제안 어조로 작성하라.
 
 아래 두 항목을 JSON으로 반환하라:
 {{
   "comment": "전체 VOC 상황 요약 (2~3문장, 한국어)",
-  "actions": ["권장 대응 액션 1", "권장 대응 액션 2", "권장 대응 액션 3"]
+  "opinions": ["의견 1", "의견 2", "의견 3"]
 }}
 
 JSON만 출력하라."""
@@ -106,10 +116,10 @@ JSON만 출력하라."""
             text = "\n".join(lines[1:-1] if lines[-1] == "```" else lines[1:])
         data = json.loads(text)
         comment = data.get("comment", "")
-        actions = "\n".join(f"{i+1}. {a}" for i, a in enumerate(data.get("actions", [])))
-        return comment, actions
+        opinions = "\n".join(f"{i+1}. {a}" for i, a in enumerate(data.get("opinions", [])))
+        return comment, opinions
     except Exception as e:
-        return f"AI 코멘트 생성 실패: {e}", ""
+        return f"코멘트 생성 실패: {e}", ""
 
 
 def _compute_app_stat(app_key: str, app_info: dict, domain_records: list[dict]) -> dict:
@@ -125,13 +135,23 @@ def _compute_app_stat(app_key: str, app_info: dict, domain_records: list[dict]) 
     }
 
 
-def _build_domain_message(domain_info: dict, domain_records: list[dict]) -> str:
+def _period_text(days: int) -> tuple[str, str]:
+    """조회 기간을 ("YYYY-MM-DD ~ YYYY-MM-DD", "최근 N일") 형태로 반환한다 (리뷰 작성일 기준)."""
+    end = datetime.now()
+    start = end - timedelta(days=days)
+    return f"{start:%Y-%m-%d} ~ {end:%Y-%m-%d}", f"최근 {days}일"
+
+
+def _build_domain_message(domain_info: dict, domain_records: list[dict], days: int) -> str:
     """도메인 하나(예: game, health)에 대한 완결된 브리핑 메시지를 만든다."""
-    today = datetime.now().strftime("%Y-%m-%d")
-    header = f"{domain_info.get('emoji', '')} {domain_info['label']} VOC 일일 브리핑 | {today}".strip()
+    period, span = _period_text(days)
+    title = f"{domain_info.get('emoji', '')} {domain_info['label']} VOC 브리핑".strip()
+    header = f"{title}\n기간: {period} ({span}, 리뷰 작성일 기준)"
 
     if not domain_records:
-        return f"{header}\n\n오늘 새로운 리뷰가 없습니다."
+        return f"{header}\n\n해당 기간에 분석된 리뷰가 없습니다."
+
+    header += f"\n분석 리뷰: {len(domain_records)}건"
 
     app_stats = {
         app_key: _compute_app_stat(app_key, app_info, domain_records)
@@ -145,11 +165,12 @@ def _build_domain_message(domain_info: dict, domain_records: list[dict]) -> str:
 
     top3 = _get_top3(domain_records)
     issue_lines = "\n".join(
-        f"{i+1}. [{r['game']} · {r['category']}] {r.get('summary', r.get('review_text', ''))[:50]}"
+        f"{i+1}. [{domain_info['apps'].get(r['game'], {}).get('label', r['game'])} · {r['category']}] "
+        f"{r.get('summary', r.get('review_text', ''))[:50]}"
         for i, r in enumerate(top3)
     ) or "해당 없음"
 
-    comment, actions = _generate_ai_comment(app_stats, top3)
+    comment, opinions = _generate_ai_comment(domain_info, app_stats, top3, f"{period} ({span})")
 
     parts = [
         header,
@@ -162,10 +183,10 @@ def _build_domain_message(domain_info: dict, domain_records: list[dict]) -> str:
     ]
 
     if comment:
-        parts += ["", "🤖 AI 코멘트", comment]
+        parts += ["", "📝 코멘트", comment]
 
-    if actions:
-        parts += ["", "💡 권장 액션", actions]
+    if opinions:
+        parts += ["", "💬 의견", opinions]
 
     return "\n".join(parts)
 
@@ -183,7 +204,7 @@ def _send(token: str, chat_id: str, text: str) -> None:
         raise RuntimeError(f"Telegram 발송 실패: {result}")
 
 
-def send_no_review_notice(domain: str | None = None, game: str | None = None) -> None:
+def send_no_review_notice(domain: str | None = None, game: str | None = None, days: int = 30) -> None:
     """당일 새 리뷰가 없을 때 텔레그램으로 알린다.
     domain/game을 지정하면 헤더에 어느 범위에서 0건이었는지 명시한다 (미지정 시 전체 범위)."""
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -193,7 +214,7 @@ def send_no_review_notice(domain: str | None = None, game: str | None = None) ->
         print("[reporter] TELEGRAM_BOT_TOKEN/CHAT_ID 없음 - 스킵")
         return
 
-    today = datetime.now().strftime("%Y-%m-%d")
+    period, span = _period_text(days)
 
     if game:
         app_info = get_apps().get(game, {})
@@ -205,7 +226,7 @@ def send_no_review_notice(domain: str | None = None, game: str | None = None) ->
     else:
         label = "📋 VOC"
 
-    text = f"{label} 일일 브리핑 | {today}\n\n오늘 새로운 리뷰가 없습니다."
+    text = f"{label} 브리핑\n기간: {period} ({span}, 리뷰 작성일 기준)\n\n해당 기간에 수집된 새 리뷰가 없습니다."
 
     try:
         _send(token, chat_id, text)
@@ -235,7 +256,7 @@ def send_briefing(days: int = 30, domain: str | None = None) -> None:
     for domain_key in domain_keys:
         domain_info = DOMAINS[domain_key]
         domain_records = [r for r in records if _domain_of(r) == domain_key]
-        message = _build_domain_message(domain_info, domain_records)
+        message = _build_domain_message(domain_info, domain_records, days)
 
         try:
             _send(token, chat_id, message)

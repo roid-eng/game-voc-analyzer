@@ -25,7 +25,7 @@ def run(game_key: str | None, domain_key: str | None, days: int) -> None:
 
     if not records:
         print("[main] 수집된 리뷰가 없습니다.")
-        send_no_review_notice(domain=domain_key, game=game_key)
+        send_no_review_notice(domain=domain_key, game=game_key, days=days)
         return
 
     # 2. 분석

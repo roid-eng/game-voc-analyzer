@@ -121,7 +121,7 @@ game-voc-analyzer/
 
 | 컬럼명 | 타입 | 설명 |
 |--------|------|------|
-| date | DATE | 수집 날짜 (YYYY-MM-DD) |
+| date | DATE | 리뷰 작성일 (YYYY-MM-DD, Google Play 리뷰의 `at` 값 — 수집한 날짜가 아님) |
 | domain | STRING | game / health |
 | app | STRING | 앱 식별자 (예: lineage_m, browndust2, samsung_health) — 기존 `game` 컬럼을 이름만 변경 |
 | genre | STRING | 장르/서비스 분류 (예: MMORPG, 전략RPG, 헬스케어) |
